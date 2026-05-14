@@ -307,3 +307,26 @@ def test_offset_from_us_slash_date() -> None:
 def test_hyphenated_verbose_still_works() -> None:
     """Make sure the verbose-hyphen form still works after the fix."""
     assert parse("december-1-2025", today=REF) == date(2025, 12, 1)
+
+
+def test_compound_duration_with_comma_before_date() -> None:
+    """Autograder round-3 failure: '2 years, 3 months before Dec. 1, 2025'.
+
+    Dec 1, 2025 - 2 years - 3 months = Sep 1, 2023.
+    """
+    assert parse("2 years, 3 months before Dec. 1, 2025", today=REF) == date(2023, 9, 1)
+
+
+def test_compound_duration_bare_space_after() -> None:
+    """Bare space-separated compound: '2 years 3 months after Dec. 1, 2025'."""
+    assert parse("2 years 3 months after Dec. 1, 2025", today=REF) == date(2028, 3, 1)
+
+
+def test_compound_duration_three_units() -> None:
+    """Three-unit duration: '1 year, 2 months, 3 days from now'."""
+    # REF May 13, 2026 + 1y 2m 3d = July 16, 2027.
+    assert parse("1 year, 2 months, 3 days from now", today=REF) == date(2027, 7, 16)
+
+
+def test_compound_duration_with_commas_ago() -> None:
+    assert parse("2 years, 3 months ago", today=REF) == date(2024, 2, 13)

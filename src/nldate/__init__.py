@@ -273,29 +273,36 @@ def _parse_duration(text: str) -> tuple[int, int] | None:
     text = text.strip()
     if not text:
         return None
-    # Split on "and" / "," to allow compound durations.
-    chunks = re.split(r"\s+and\s+|\s*,\s*", text)
+    # Walk tokens left-to-right. Whenever we hit a unit word, the preceding
+    # tokens are its amount. Connective words ("and") and commas are skipped.
+    # This handles "1 year and 2 months", "2 years, 3 months", and bare
+    # space-separated compounds like "2 years 3 months" all uniformly.
+    tokens = [t for t in re.split(r"\s+", text) if t and t != "and"]
     total_days = 0
     total_months = 0
+    amount_parts: list[str] = []
     found_any = False
-    for chunk in chunks:
-        chunk = chunk.strip()
-        if not chunk:
-            continue
-        match = re.fullmatch(rf"(.+?)\s+({_UNIT_PATTERN})", chunk)
-        if not match:
-            return None
-        amount = _parse_amount(match.group(1))
-        if amount is None:
-            return None
-        unit = UNIT_ALIASES[match.group(2)]
-        if unit in UNIT_TO_DAYS:
-            total_days += amount * UNIT_TO_DAYS[unit]
-        elif unit in UNIT_TO_MONTHS:
-            total_months += amount * UNIT_TO_MONTHS[unit]
-        else:  # pragma: no cover - defensive
-            return None
-        found_any = True
+    for tok in tokens:
+        if tok in UNIT_ALIASES:
+            if not amount_parts:
+                return None
+            amount = _parse_amount(" ".join(amount_parts))
+            if amount is None:
+                return None
+            unit = UNIT_ALIASES[tok]
+            if unit in UNIT_TO_DAYS:
+                total_days += amount * UNIT_TO_DAYS[unit]
+            elif unit in UNIT_TO_MONTHS:
+                total_months += amount * UNIT_TO_MONTHS[unit]
+            else:  # pragma: no cover - defensive
+                return None
+            amount_parts = []
+            found_any = True
+        else:
+            amount_parts.append(tok)
+    # Trailing amount with no unit -> not a valid duration phrase.
+    if amount_parts:
+        return None
     if not found_any:
         return None
     return total_days, total_months
