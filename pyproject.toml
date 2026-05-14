@@ -1,0 +1,42 @@
+[project]
+name = "nldate"
+version = "0.1.0"
+description = "Parse natural-language date strings into datetime.date objects."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Camille Tran", email = "camilletran02@gmail.com" },
+]
+dependencies = []
+
+[project.scripts]
+nldate = "nldate:main"
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.10",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
