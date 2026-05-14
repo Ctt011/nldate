@@ -159,15 +159,41 @@ def _strip_ordinals(s: str) -> str:
 
 
 def _normalize(s: str) -> str:
-    """Lowercase, strip filler, normalize whitespace, drop ordinal suffixes."""
+    """Lowercase, strip filler, normalize whitespace, drop ordinal suffixes.
+
+    Handles:
+      * trailing periods on words (``Dec.`` -> ``dec``) without touching
+        digit-separated dates like ``12.01.2025``;
+      * possessives (``today's date`` -> ``today date``);
+      * commas, hyphens-as-spaces in date phrases (``december-1-2025`` ->
+        ``december 1 2025``), and the filler words ``of`` and ``the``.
+    """
     if not isinstance(s, str):
         raise TypeError(f"parse() expects a str, got {type(s).__name__}")
     text = s.strip().lower()
     text = _strip_ordinals(text)
-    # Drop commas and "of" (e.g. "1st of December" -> "1 december").
-    text = text.replace(",", " ")
+    # Strip period after a letter (e.g. "dec." -> "dec"). Leaves digit-dotted
+    # dates like "12.01.2025" alone because the period there follows a digit.
+    text = re.sub(r"([a-z])\.", r"\1", text)
+    # Strip apostrophe-s possessives ("today's" -> "today"). Handles both
+    # straight (U+0027) and curly (U+2019) apostrophes.
+    text = re.sub(r"([a-z])['\u2019]s\b", r"\1", text)
+    # Replace stray punctuation with space (commas, semicolons).
+    text = re.sub(r"[,;]", " ", text)
+    # Hyphens between letters/numbers in verbose dates -> spaces, but leave
+    # ISO-style numeric dates ("2025-12-01") intact.
+    text = re.sub(r"(?<=[a-z])-(?=[a-z\d])", " ", text)
+    text = re.sub(r"(?<=\d)-(?=[a-z])", " ", text)
+    # If the input mentions a month/weekday/anchor word, treat any remaining
+    # digit-hyphen-digit as a separator too (e.g. "december-1-2025" -> spaces).
+    # ISO numeric-only inputs like "2025-12-01" don't contain letters, so they
+    # skip this rule and stay intact for the absolute-date matcher.
+    if re.search(r"[a-z]", text):
+        text = re.sub(r"(?<=\d)-(?=\d)", " ", text)
     text = re.sub(r"\bof\b", " ", text)
     text = re.sub(r"\bthe\b", " ", text)
+    # "today's date" -> "today date" -> drop "date" as filler.
+    text = re.sub(r"\bdate\b", " ", text)
     # Collapse whitespace.
     text = re.sub(r"\s+", " ", text).strip()
     return text
@@ -415,6 +441,29 @@ def _parse_anchor(text: str, today: date) -> date | None:
     return None
 
 
+_PERIOD_OFFSETS: dict[str, tuple[int, int]] = {
+    # period_word -> (days, months) offset for "next <period>"
+    "week": (7, 0),
+    "month": (0, 1),
+    "year": (0, 12),
+}
+
+
+def _resolve_period_phrase(text: str, today: date) -> date | None:
+    """Resolve "next/this/last <week|month|year>" into a date offset from today."""
+    m = re.fullmatch(r"(next|this|last|past|previous|coming|upcoming)\s+(week|month|year)", text)
+    if not m:
+        return None
+    qualifier, period = m.group(1), m.group(2)
+    days, months = _PERIOD_OFFSETS[period]
+    if qualifier in ("next", "coming", "upcoming"):
+        return _apply_offset(today, days, months)
+    if qualifier in ("last", "past", "previous"):
+        return _apply_offset(today, -days, -months)
+    # "this <period>" -> today (the closest date in the current period).
+    return today
+
+
 def _parse_inner(text: str, today: date) -> date | None:
     """Parse a normalized phrase into a concrete date, or return None.
 
@@ -433,6 +482,11 @@ def _parse_inner(text: str, today: date) -> date | None:
     weekday_result = _resolve_weekday(text, today)
     if weekday_result is not None:
         return weekday_result
+
+    # 2b. Period phrases ("next week", "last month", "next year").
+    period_result = _resolve_period_phrase(text, today)
+    if period_result is not None:
+        return period_result
 
     # 3. "in <duration>" -> today + duration.
     m = re.fullmatch(r"in\s+(.+)", text)

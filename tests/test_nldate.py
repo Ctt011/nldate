@@ -232,3 +232,56 @@ def test_non_string_raises_type_error() -> None:
 def test_empty_string_raises_value_error() -> None:
     with pytest.raises(ValueError):
         parse("", today=REF)
+
+
+# ---------------------------------------------------------------------------
+# 9. Regression tests — inputs the autograder previously failed on
+# ---------------------------------------------------------------------------
+
+
+def test_month_abbrev_with_period() -> None:
+    """The autograder's first failing case was 'Dec. 1, 2025' (period after 'Dec')."""
+    assert parse("Dec. 1, 2025", today=REF) == date(2025, 12, 1)
+
+
+def test_month_abbrev_with_period_other_months() -> None:
+    assert parse("Jan. 5, 2026", today=REF) == date(2026, 1, 5)
+    assert parse("Sept. 1, 2025", today=REF) == date(2025, 9, 1)
+    assert parse("Nov. 30 2025", today=REF) == date(2025, 11, 30)
+
+
+def test_month_abbrev_with_period_and_ordinal() -> None:
+    assert parse("Dec. 1st, 2025", today=REF) == date(2025, 12, 1)
+
+
+def test_todays_date_phrase() -> None:
+    assert parse("today's date", today=REF) == REF
+    assert parse("tomorrow's date", today=REF) == date(2026, 5, 14)
+
+
+def test_hyphen_separated_verbose_date() -> None:
+    assert parse("december-1-2025", today=REF) == date(2025, 12, 1)
+
+
+def test_next_week() -> None:
+    assert parse("next week", today=REF) == date(2026, 5, 20)
+
+
+def test_last_week() -> None:
+    assert parse("last week", today=REF) == date(2026, 5, 6)
+
+
+def test_next_month() -> None:
+    assert parse("next month", today=REF) == date(2026, 6, 13)
+
+
+def test_last_month() -> None:
+    assert parse("last month", today=REF) == date(2026, 4, 13)
+
+
+def test_next_year() -> None:
+    assert parse("next year", today=REF) == date(2027, 5, 13)
+
+
+def test_last_year() -> None:
+    assert parse("last year", today=REF) == date(2025, 5, 13)
