@@ -182,13 +182,15 @@ def _normalize(s: str) -> str:
     text = re.sub(r"[,;]", " ", text)
     # Hyphens between letters/numbers in verbose dates -> spaces, but leave
     # ISO-style numeric dates ("2025-12-01") intact.
+    before_alpha = text
     text = re.sub(r"(?<=[a-z])-(?=[a-z\d])", " ", text)
     text = re.sub(r"(?<=\d)-(?=[a-z])", " ", text)
-    # If the input mentions a month/weekday/anchor word, treat any remaining
-    # digit-hyphen-digit as a separator too (e.g. "december-1-2025" -> spaces).
-    # ISO numeric-only inputs like "2025-12-01" don't contain letters, so they
-    # skip this rule and stay intact for the absolute-date matcher.
-    if re.search(r"[a-z]", text):
+    # Only collapse remaining digit-hyphen-digit if the prior alpha rules
+    # actually fired — that signals we're parsing a verbose date like
+    # "december-1-2025" where hyphens are word separators throughout. If they
+    # didn't fire, an embedded ISO date like "2 weeks after 2025-12-04" stays
+    # intact for the absolute-date matcher.
+    if text != before_alpha:
         text = re.sub(r"(?<=\d)-(?=\d)", " ", text)
     text = re.sub(r"\bof\b", " ", text)
     text = re.sub(r"\bthe\b", " ", text)

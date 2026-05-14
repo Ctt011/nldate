@@ -285,3 +285,25 @@ def test_next_year() -> None:
 
 def test_last_year() -> None:
     assert parse("last year", today=REF) == date(2025, 5, 13)
+
+
+def test_offset_from_iso_date() -> None:
+    """The autograder's second-round failing case: '2 weeks after 2025-12-04'.
+
+    Critical: the ISO date inside the expression must NOT be split by
+    hyphen-normalization just because the input also contains letters.
+    """
+    assert parse("2 weeks after 2025-12-04", today=REF) == date(2025, 12, 18)
+
+
+def test_offset_from_iso_date_before() -> None:
+    assert parse("5 days before 2025-12-01", today=REF) == date(2025, 11, 26)
+
+
+def test_offset_from_us_slash_date() -> None:
+    assert parse("3 days after 12/04/2025", today=REF) == date(2025, 12, 7)
+
+
+def test_hyphenated_verbose_still_works() -> None:
+    """Make sure the verbose-hyphen form still works after the fix."""
+    assert parse("december-1-2025", today=REF) == date(2025, 12, 1)
